@@ -23,26 +23,25 @@ type JSONobj = {
 	[key: string]: JSONobj | JSONobj[] | number | string | boolean | null;
 };
 
-export type SessionedRequest = Request & {
+export interface SessionedRequest extends Request {
 	session: JSONobj;
-};
+}
 
-export type SessionedResponse = Response & {
-	saveSession(): Promise<void>;
-};
+export interface SessionedResponse extends Response {
+	saveSession(): this;
+	deleteSession(): this;
+}
 const arrayify = (passwords: Password[] | Password) =>
 	Array.isArray(passwords) ? passwords : [passwords];
 
 export const LAST = Symbol.for("last");
 const normalizeIndex = (index: typeof LAST | number, passwords: Password[]) =>
 	index === LAST ? passwords.length - 1 : index;
-/**
- * Session middleware for coggers, make sure to save after modifications using `res.saveSession()`
- * @param options
- */
+
+/** Session middleware for coggers, make sure to save after modifications using `res.saveSession()` */
 export const coggersSession = (options: Options): Middleware => {
 	const cookieName = options.name ?? "session";
-	const passwords = arrayify(options.password);
+	const passwords = arrayify(options.password).map(Buffer.from);
 	for (const pass of passwords)
 		if (pass.length < 32) throw new Error("Password too short.");
 
@@ -51,34 +50,45 @@ export const coggersSession = (options: Options): Middleware => {
 
 	const cookieOptions = { ...defaultCookieOptions, ...options.cookie };
 
-	return async (req: SessionedRequest, res: SessionedResponse) => {
+	return (req: SessionedRequest, res: SessionedResponse) => {
 		req.session = {};
 		if (req.headers.cookie != null) {
 			const cookie = parse(req.headers.cookie)[cookieName];
 			if (cookie != null) {
 				try {
-					req.session = JSON.parse(
-						(await unseal(passwords, cookie)).toString()
-					);
+					req.session = JSON.parse(unseal(passwords, cookie).toString());
 				} catch (err) {
 					// ignore
 				}
 			}
 		}
-		res.saveSession = async () => {
-			// Merge old and new res Set-Cookie headers.
-			const prevCookie = res.headers["Set-Cookie"] as string | string[];
-			const session = serialize(
-				cookieName,
-				await seal(sealPass, sealPassId, JSON.stringify(req.session)),
-				cookieOptions
-			);
 
-			if (prevCookie == null) res.headers["Set-Cookie"] = session;
+		const addCookie = (newCookie: string) => {
+			const prevCookie = res.headers["Set-Cookie"] as string | string[];
+			if (prevCookie == null) res.headers["Set-Cookie"] = newCookie;
 			else
 				res.headers["Set-Cookie"] = Array.isArray(prevCookie)
-					? [...prevCookie, session]
-					: [prevCookie, session];
+					? [...prevCookie, newCookie]
+					: [prevCookie, newCookie];
+
+			return res;
+		};
+
+		res.saveSession = () => {
+			addCookie(
+				serialize(
+					cookieName,
+					seal(sealPass, sealPassId, JSON.stringify(req.session)),
+					cookieOptions
+				)
+			);
+			return res;
+		};
+		res.deleteSession = () => {
+			addCookie(
+				serialize(cookieName, "cleared", { ...cookieOptions, maxAge: 0 })
+			);
+			return res;
 		};
 	};
 };

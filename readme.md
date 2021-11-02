@@ -14,12 +14,11 @@ const coggers = new Coggers({
 		}),
 	],
 	async $get(req, res) {
-		if (req.session.refreshed) res.send("You refreshed!");
-		else {
-			req.session.refreshed = true;
-			await res.saveSession();
-			res.send("Refresh!");
-		}
+		const count = req.session.count;
+		if (count) req.session.count++;
+		else req.session.count = 1;
+		await res.saveSession();
+		res.send(`You've refreshed ${count} times!`);
 	},
 });
 
@@ -27,3 +26,5 @@ coggers
 	.listen(8080)
 	.then(() => console.log("Listening at http://localhost:8080/"));
 ```
+
+<!-- TODO: Documentation for password rotation -->

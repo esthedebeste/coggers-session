@@ -14,7 +14,6 @@
 	"license": "MIT",
 	"type": "module",
 	"dependencies": {
-		"@hapi/iron": "^6.0.0",
 		"@tinyhttp/cookie": "^2.0.3"
 	},
 	"devDependencies": {

@@ -1,31 +1,21 @@
-import {
-	defaults as defaultSealOptions,
-	Password,
-	seal,
-	SealOptions,
-	unseal,
-} from "@hapi/iron";
 import { parse, serialize, SerializeOptions } from "@tinyhttp/cookie";
 import type { Middleware, Request, Response } from "coggers";
+import { seal, unseal } from "./seal.js";
 
 const defaultCookieOptions: SerializeOptions = {
 	httpOnly: true,
 	sameSite: "lax",
 };
 
-type Pass = Record<string, Password> | Password[] | Password;
-
-export const LAST = Symbol.for("last");
-export const FIRST = Symbol.for("first");
+type Password = string | Buffer;
 
 type Options = {
-	/** password used for sealing */
-	password: Pass;
+	/** passwords used for sealing and unsealing. needs to be over 32 characters, but more importantly, needs to be random. */
+	password: Password[] | Password;
 	/** the name the cookie will be saved as, defaults to "session" */
 	name?: string;
-	/** Key of the password to seal with. Defaults to `LAST` (`import { LAST } from "coggers-session"`). */
-	passwordIndex?: typeof FIRST | typeof LAST | string;
-	seal?: SealOptions;
+	/** Index of the password to seal with. Default (and recommended) is `LAST` (`import { LAST } from "coggers-session") */
+	passwordIndex?: typeof LAST | number;
 	cookie?: SerializeOptions;
 };
 
@@ -40,42 +30,26 @@ export type SessionedRequest = Request & {
 export type SessionedResponse = Response & {
 	saveSession(): Promise<void>;
 };
+const arrayify = (passwords: Password[] | Password) =>
+	Array.isArray(passwords) ? passwords : [passwords];
 
-const hashify = (password: Pass): Record<string, Password> => {
-	if (typeof password === "string" || password instanceof Buffer)
-		return { default: password };
-	// @ts-ignore object-spreading an array does not copy the length.
-	if (Array.isArray(password)) return { ...password };
-	return password;
-};
-
-const getSealPassword = (
-	passwords: Record<string, Password>,
-	index: typeof FIRST | typeof LAST | string
-) => {
-	if (typeof index === "string") return passwords[index];
-	else if (index === FIRST) return Object.values(passwords)[0];
-	else if (index === LAST) {
-		const values = Object.values(passwords);
-		return values[values.length - 1];
-	}
-};
-
+export const LAST = Symbol.for("last");
+const normalizeIndex = (index: typeof LAST | number, passwords: Password[]) =>
+	index === LAST ? passwords.length - 1 : index;
 /**
  * Session middleware for coggers, make sure to save after modifications using `res.saveSession()`
- * @param password Passwords need to be over 32 characters, make sure they're secure!
  * @param options
  */
 export const coggersSession = (options: Options): Middleware => {
 	const cookieName = options.name ?? "session";
-	const password = hashify(options.password);
-	const sealPass: Password = getSealPassword(
-		password,
-		options.passwordIndex ?? LAST
-	);
+	const passwords = arrayify(options.password);
+	for (const pass of passwords)
+		if (pass.length < 32) throw new Error("Password too short.");
+
+	const sealPassId = normalizeIndex(options.passwordIndex ?? LAST, passwords);
+	const sealPass = passwords[sealPassId];
 
 	const cookieOptions = { ...defaultCookieOptions, ...options.cookie };
-	const sealOptions = { ...defaultSealOptions, ...options.seal };
 
 	return async (req: SessionedRequest, res: SessionedResponse) => {
 		req.session = {};
@@ -83,8 +57,10 @@ export const coggersSession = (options: Options): Middleware => {
 			const cookie = parse(req.headers.cookie)[cookieName];
 			if (cookie != null) {
 				try {
-					req.session = await unseal(cookie, password, sealOptions);
-				} catch (error) {
+					req.session = JSON.parse(
+						(await unseal(passwords, cookie)).toString()
+					);
+				} catch (err) {
 					// ignore
 				}
 			}
@@ -94,7 +70,7 @@ export const coggersSession = (options: Options): Middleware => {
 			const prevCookie = res.headers["Set-Cookie"] as string | string[];
 			const session = serialize(
 				cookieName,
-				await seal(req.session, sealPass, sealOptions),
+				await seal(sealPass, sealPassId, JSON.stringify(req.session)),
 				cookieOptions
 			);
 

@@ -1,7 +1,11 @@
 import { Coggers } from "coggers";
 import { randomBytes } from "crypto";
 import { makeFetch } from "supertest-fetch";
-import { coggersSession } from "../src/index.js";
+import {
+	coggersSession,
+	SessionedRequest,
+	SessionedResponse,
+} from "../src/index.js";
 const password = [
 	randomBytes(32).toString("base64url"),
 	randomBytes(32).toString("base64url"),
@@ -17,13 +21,14 @@ const coggers = new Coggers({
 			},
 		}),
 	],
-	async $get(req, res) {
+	$get(req: SessionedRequest, res: SessionedResponse) {
 		const count = req.session.count;
 		if (count) req.session.count++;
 		else req.session.count = 1;
-		await res.saveSession();
+		if (count > 2) return res.deleteSession().send("TODO: Numbers after 2");
+		res.saveSession();
 		if (count == null) return res.send("Refresh!");
-		res.send(`You've refreshed ${count === 1 ? "once" : `${count} times`}!`);
+		res.send(`You've refreshed ${count === 1 ? "once" : `twice`}!`);
 	},
 });
 
@@ -34,15 +39,21 @@ if (process.argv.includes("--browser"))
 else
 	coggers.listen(0).then(async server => {
 		const fetch = makeFetch(server);
-		const { headers } = await fetch("/").expect(200, "Refresh!").end();
-		let cookie = headers.get("Set-Cookie");
-		const second = await fetch("/", { headers: { Cookie: cookie } })
-			.expect(200, "You've refreshed once!")
-			.end();
-		cookie = second.headers.get("Set-Cookie");
-		await fetch("/", { headers: { Cookie: cookie } })
-			.expect(200, "You've refreshed 2 times!")
-			.end();
+		let cookie = "";
+		const test = async body => {
+			const req = await fetch("/", { headers: { Cookie: cookie } })
+				.expect(200, body)
+				.end();
+			cookie = req.headers.get("Set-Cookie");
+			if (cookie.includes("Max-Age=0;")) cookie = "";
+			return req;
+		};
+
+		await test("Refresh!");
+		await test("You've refreshed once!");
+		await test("You've refreshed twice!");
+		await test("TODO: Numbers after 2");
+		await test("Refresh!");
 		console.log("\x1b[32mTests passed!\x1b[0m");
 		server.close();
 	});

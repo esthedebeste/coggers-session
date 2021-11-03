@@ -15,16 +15,6 @@ const timingSafeEqual = (a: Buffer, b: Buffer) => {
 const SEP = ".";
 const VERSION = "1";
 
-/**
- * @returns a 7-part string that consists of:
- * 	- version
- * 	- password ID
- * 	- initialization vector
- * 	- encryption salt
- * 	- integrity salt
- * 	- encrypted data (encrypted with a key derived of the encryption salt and the password)
- * 	- integrity string (the original data, HMACd with a key derived of the integrity salt and the password)
- */
 export function seal(
 	password: BinaryLike,
 	passid: number,
@@ -76,7 +66,7 @@ export function unseal(passwords: BinaryLike[], data: string): Buffer {
 		.createHmac("sha256", keyI)
 		.update(dataU)
 		.digest();
-	if (timingSafeEqual(integrity, integrityCheck))
+	if (!timingSafeEqual(integrity, integrityCheck))
 		throw new UnsealError("Integrity check failed. (Tampered contents)");
 
 	return dataU;

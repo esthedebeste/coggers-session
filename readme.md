@@ -79,6 +79,8 @@ coggers-session supports password rotation, meaning that you can switch around t
 You can use password rotation simply by putting an array into the `password` field.
 If you ever want to use a new password, you can just add it to the end of the array. If you want to reuse an old password, you'll need to define the `passwordIndex` option to be the index of that old password.
 
+For example, if you want to add a password to `session({ password: "pass1" })`, it would look like `session({ password: ["pass1", "pass2"] })`. Then, if you wanted to go back to `pass1`, you can use `session({ password: ["pass1", "pass2"], passwordIndex: 0 })`.
+
 **Do not move a password around, or remove it from the array. This can invalidate old sessions.**
 
 #### Internal workings

@@ -19,18 +19,15 @@ type Options = {
 	cookie?: SerializeOptions;
 };
 
-type JSONobj = {
-	[key: string]: JSONobj | JSONobj[] | number | string | boolean | null;
+export type SessionedRequest = Request & {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	session?: any;
 };
 
-export interface SessionedRequest extends Request {
-	session: JSONobj;
-}
-
-export interface SessionedResponse extends Response {
-	saveSession(): this;
-	deleteSession(): this;
-}
+export type SessionedResponse = Response & {
+	saveSession?: () => Response;
+	deleteSession?: () => Response;
+};
 const arrayify = (passwords: Password[] | Password) =>
 	Array.isArray(passwords) ? passwords : [passwords];
 
@@ -74,7 +71,7 @@ export const coggersSession = (options: Options): Middleware => {
 			return res;
 		};
 
-		res.saveSession = () => {
+		res.saveSession = () =>
 			addCookie(
 				serialize(
 					cookieName,
@@ -82,14 +79,10 @@ export const coggersSession = (options: Options): Middleware => {
 					cookieOptions
 				)
 			);
-			return res;
-		};
-		res.deleteSession = () => {
+		res.deleteSession = () =>
 			addCookie(
 				serialize(cookieName, "cleared", { ...cookieOptions, maxAge: 0 })
 			);
-			return res;
-		};
 	};
 };
 export default coggersSession;

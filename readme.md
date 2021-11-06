@@ -41,8 +41,7 @@ Used to get an initialized middleware for coggers. The `options` object contains
   When using [rotating passwords](#password-rotation), the index of the password to seal with. Defaults to the last password in the array.
 
 - cookie <br>
-  Options for the cookie. Defaults are { httpOnly: true, sameSite: "lax" } <br>
-  See [@tinyhttp/cookie](https://npmjs.com/@tinyhttp/cookie)
+  Options for the cookie. Defaults are { httpOnly: true, sameSite: "Lax" }
 
 ### req.session
 

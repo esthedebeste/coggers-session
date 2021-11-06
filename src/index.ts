@@ -18,10 +18,14 @@ type Options = {
 	/** Index of the password to seal with. Default (and recommended) is `LAST` (`import { LAST } from "coggers-session") */
 	passwordIndex?: typeof LAST | number;
 	cookie?: SerializeOptions;
+
+	/** Defaults to JSON.stringify */
+	stringify?: (obj) => string;
+	/** Defaults to JSON.parse */
+	parse?: (str: string) => any;
 };
 
 export type SessionedRequest = Request & {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	session?: any;
 };
 
@@ -34,16 +38,20 @@ const arrayify = (passwords: Password[] | Password) =>
 
 export const LAST = Symbol.for("last");
 const normalizeIndex = (index: typeof LAST | number, passwords: Password[]) =>
-	index === LAST ? passwords.length - 1 : index;
+	typeof index === "number" ? index : passwords.length - 1;
 
 /** Session middleware for coggers, make sure to save after modifications using `res.saveSession()` */
 export const coggersSession = (options: Options): Middleware => {
-	const cookieName = options.name ?? "session";
+	const {
+		stringify = JSON.stringify,
+		parse = JSON.parse,
+		name: cookieName = "session",
+	} = options;
 	const passwords = arrayify(options.password).map(Buffer.from);
 	for (const pass of passwords)
 		if (pass.length < 32) throw new Error("Password too short.");
 
-	const sealPassId = normalizeIndex(options.passwordIndex ?? LAST, passwords);
+	const sealPassId = normalizeIndex(options.passwordIndex, passwords);
 	const sealPass = passwords[sealPassId];
 
 	const cookieOptions = { ...defaultCookieOptions, ...options.cookie };
@@ -53,7 +61,7 @@ export const coggersSession = (options: Options): Middleware => {
 		const cookie = req.cookies[cookieName];
 		if (cookie != null) {
 			try {
-				req.session = JSON.parse(unseal(passwords, cookie).toString());
+				req.session = parse(unseal(passwords, cookie).toString());
 			} catch (err) {
 				// ignore
 			}
@@ -62,7 +70,7 @@ export const coggersSession = (options: Options): Middleware => {
 		res.saveSession = () =>
 			res.cookie(
 				cookieName,
-				seal(sealPass, sealPassId, JSON.stringify(req.session)),
+				seal(sealPass, sealPassId, stringify(req.session)),
 				cookieOptions
 			);
 

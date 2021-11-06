@@ -1,6 +1,6 @@
 {
 	"name": "coggers-session",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"description": "Session middleware for Coggers",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -14,13 +14,12 @@
 	"license": "MIT",
 	"type": "module",
 	"dependencies": {
-		"@tinyhttp/cookie": "^2.0.3"
+		"coggers": "^1.5.0"
 	},
 	"devDependencies": {
 		"@types/node": "^16.11.6",
 		"@typescript-eslint/eslint-plugin": "^5.2.0",
 		"@typescript-eslint/parser": "^5.2.0",
-		"coggers": "^1.4.0",
 		"eslint": "^8.1.0",
 		"eslint-config-prettier": "^8.3.0",
 		"prettier": "^2.4.1",

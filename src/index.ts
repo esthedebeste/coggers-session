@@ -1,10 +1,11 @@
-import { parse, serialize, SerializeOptions } from "@tinyhttp/cookie";
 import type { Middleware, Request, Response } from "coggers";
 import { seal, unseal } from "./seal.js";
 
+type SerializeOptions = Parameters<typeof Response.prototype.cookie>[2];
+
 const defaultCookieOptions: SerializeOptions = {
 	httpOnly: true,
-	sameSite: "lax",
+	sameSite: "Lax",
 };
 
 type Password = string | Buffer;
@@ -49,40 +50,24 @@ export const coggersSession = (options: Options): Middleware => {
 
 	return (req: SessionedRequest, res: SessionedResponse) => {
 		req.session = {};
-		if (req.headers.cookie != null) {
-			const cookie = parse(req.headers.cookie)[cookieName];
-			if (cookie != null) {
-				try {
-					req.session = JSON.parse(unseal(passwords, cookie).toString());
-				} catch (err) {
-					// ignore
-				}
+		const cookie = req.cookies[cookieName];
+		if (cookie != null) {
+			try {
+				req.session = JSON.parse(unseal(passwords, cookie).toString());
+			} catch (err) {
+				// ignore
 			}
 		}
 
-		const addCookie = (newCookie: string) => {
-			const prevCookie = res.headers["Set-Cookie"] as string | string[];
-			if (prevCookie == null) res.headers["Set-Cookie"] = newCookie;
-			else
-				res.headers["Set-Cookie"] = Array.isArray(prevCookie)
-					? [...prevCookie, newCookie]
-					: [prevCookie, newCookie];
-
-			return res;
-		};
-
 		res.saveSession = () =>
-			addCookie(
-				serialize(
-					cookieName,
-					seal(sealPass, sealPassId, JSON.stringify(req.session)),
-					cookieOptions
-				)
+			res.cookie(
+				cookieName,
+				seal(sealPass, sealPassId, JSON.stringify(req.session)),
+				cookieOptions
 			);
+
 		res.deleteSession = () =>
-			addCookie(
-				serialize(cookieName, "cleared", { ...cookieOptions, maxAge: 0 })
-			);
+			res.cookie(cookieName, "", { ...cookieOptions, maxAge: 0 });
 	};
 };
 export default coggersSession;

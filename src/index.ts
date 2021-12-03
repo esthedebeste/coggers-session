@@ -6,6 +6,7 @@ type SerializeOptions = Parameters<typeof Response.prototype.cookie>[2];
 const defaultCookieOptions: SerializeOptions = {
 	httpOnly: true,
 	sameSite: "Lax",
+	maxAge: 604800,
 };
 
 type Password = string | Buffer;
@@ -41,7 +42,12 @@ const normalizeIndex = (index: typeof LAST | number, passwords: Password[]) =>
 	typeof index === "number" ? index : passwords.length - 1;
 
 /** Session middleware for coggers, make sure to save after modifications using `res.saveSession()` */
-export const coggersSession = (options: Options): Middleware => {
+export const coggersSession = (
+	options: Options
+): Middleware & {
+	seal(data: any): string;
+	unseal(sealed: string): any;
+} => {
 	const {
 		stringify = JSON.stringify,
 		parse = JSON.parse,
@@ -56,7 +62,7 @@ export const coggersSession = (options: Options): Middleware => {
 
 	const cookieOptions = { ...defaultCookieOptions, ...options.cookie };
 
-	return (req: SessionedRequest, res: SessionedResponse) => {
+	const mw = (req: SessionedRequest, res: SessionedResponse) => {
 		req.session = {};
 		const cookie = req.cookies[cookieName];
 		if (cookie != null) {
@@ -77,5 +83,9 @@ export const coggersSession = (options: Options): Middleware => {
 		res.deleteSession = () =>
 			res.cookie(cookieName, "", { ...cookieOptions, maxAge: 0 });
 	};
+	mw.seal = (obj: any) => seal(sealPass, sealPassId, stringify(obj));
+	mw.unseal = (sealed: string) =>
+		JSON.parse(unseal(passwords, sealed).toString());
+	return mw;
 };
 export default coggersSession;

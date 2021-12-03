@@ -17,7 +17,7 @@ const coggers = new Coggers({
 			name: "cool-session",
 			cookie: {
 				httpOnly: true,
-				sameSite: "lax",
+				sameSite: "Lax",
 			},
 		}),
 	],
@@ -40,7 +40,7 @@ else
 	coggers.listen(0).then(async server => {
 		const fetch = makeFetch(server);
 		let cookie = "";
-		const test = async body => {
+		const test = async (body: string) => {
 			const req = await fetch("/", { headers: { Cookie: cookie } })
 				.expect(200, body)
 				.end();
